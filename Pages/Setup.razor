@@ -165,7 +165,7 @@
     <legend>Dome Driver Settings</legend>
 
     <label>Azimuth Offset:</label>
-    <input type="number" @bind="AzimuthOffset" min="0" max="360" />
+    <input type="number" @bind="ParkAzimuth" min="0" max="360" />
     <br />
 
     <label>Enable Slaving:</label>
@@ -190,7 +190,7 @@
 </fieldset>
 
 @code {
-    int AzimuthOffset { get; set; } = ServerSettings.AzimuthOffset;
+    int ParkAzimuth { get; set; } = ServerSettings.ParkAzimuth;
     bool SlavingEnabled { get; set; } = ServerSettings.SlavingEnabled;
     int ShutterOpenTime { get; set; } = ServerSettings.ShutterOpenTime;
 
@@ -353,7 +353,7 @@
     {
         try
         {
-            ServerSettings.AzimuthOffset = AzimuthOffset;
+            ServerSettings.ParkAzimuth = ParkAzimuth;
             ServerSettings.SlavingEnabled = SlavingEnabled;
             ServerSettings.ShutterOpenTime = ShutterOpenTime;
 

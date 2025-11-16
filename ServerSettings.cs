@@ -26,7 +26,7 @@ namespace GowerDome2025
         public static string ControlBoxComPort { get; set; } = string.Empty;  // todo pk added this to initialise and persist the comport
         //AI says it is possible save the setting like this in the driver.cs - ServerSettings.Save(); 
 
-        public static int AzimuthOffset { get; set; } = 0;    // the three lines here go with setup.razor
+        public static int ParkAzimuth { get; set; } = 0;    // the three lines here go with setup.razor
         public static bool SlavingEnabled { get; set; } = false;
         public static int ShutterOpenTime { get; set; } = 30;
 
