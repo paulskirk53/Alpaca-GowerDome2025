@@ -164,8 +164,9 @@
 <fieldset>
     <legend>Dome Driver Settings</legend>
 
-    <label>Azimuth Offset:</label>
-    <input type="number" @bind="ParkAzimuth" min="0" max="360" />
+    <label>Park Azimuth:</label>
+    <input type="number" @bind="ParkAzimuth" min="0" max="360" />   // this 'binds' the fields to user defined properties such as ParkAzimuth, so if user changes UI value
+                                                                    // that 'sets' the property, or if the code 'sets' the property it's reflected in the UI.
     <br />
 
     <label>Enable Slaving:</label>
@@ -177,6 +178,9 @@
     <br />
 
     <button @onclick="SaveDomeSettings" style="min-width:12ch;">Save</button>
+    
+    
+
 </fieldset>
 
 
@@ -190,9 +194,9 @@
 </fieldset>
 
 @code {
-    int ParkAzimuth { get; set; } = ServerSettings.ParkAzimuth;
-    bool SlavingEnabled { get; set; } = ServerSettings.SlavingEnabled;
-    int ShutterOpenTime { get; set; } = ServerSettings.ShutterOpenTime;
+    int ParkAzimuth { get; set; } = ServerSettings.DomeSettings.ParkAzimuth;
+    bool SlavingEnabled { get; set; } = ServerSettings.DomeSettings.SlavingEnabled;
+    int ShutterOpenTime { get; set; } = ServerSettings.DomeSettings.ShutterOpenTime;
 
     bool Discovery
     {
@@ -349,13 +353,14 @@
         }
     }
 
-    void SaveDomeSettings()  //pk from AI
+    void SaveDomeSettings()  //pk with AI
     {
         try
         {
-            ServerSettings.ParkAzimuth = ParkAzimuth;
-            ServerSettings.SlavingEnabled = SlavingEnabled;
-            ServerSettings.ShutterOpenTime = ShutterOpenTime;
+            ServerSettings.DomeSettings.ParkAzimuth = ParkAzimuth;            // sets the property parkazimuth - ParkAzimuth setter in serversettings.domesettings 
+                                                                              // writes to the XML profile to persist the azimuth value. Ditto values below
+            ServerSettings.DomeSettings.SlavingEnabled = SlavingEnabled;
+            ServerSettings.DomeSettings.ShutterOpenTime = ShutterOpenTime;
 
             DisplaySuccess("Dome Settings Saved");
         }
@@ -366,7 +371,7 @@
     }
 
 
-
+    
 
     void SaveDriverSettings()
     {

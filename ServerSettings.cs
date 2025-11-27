@@ -26,9 +26,40 @@ namespace GowerDome2025
         public static string ControlBoxComPort { get; set; } = string.Empty;  // todo pk added this to initialise and persist the comport
         //AI says it is possible save the setting like this in the driver.cs - ServerSettings.Save(); 
 
-        public static int ParkAzimuth { get; set; } = 0;    // the three lines here go with setup.razor
-        public static bool SlavingEnabled { get; set; } = false;
-        public static int ShutterOpenTime { get; set; } = 30;
+
+        internal static class DomeSettings
+        {
+            internal static ASCOM.Tools.XMLProfile Profile = new ASCOM.Tools.XMLProfile(Program.DriverID, "Server");
+
+            public static int ParkAzimuth
+            {
+                get => int.Parse(Profile.GetValue("ParkAzimuth", "0"));
+                set => Profile.WriteValue("ParkAzimuth", value.ToString());
+            }
+
+            public static bool SlavingEnabled
+            {
+                get => bool.Parse(Profile.GetValue("SlavingEnabled", "false"));
+                set => Profile.WriteValue("SlavingEnabled", value.ToString());
+            }
+
+            public static int ShutterOpenTime
+            {
+                get => int.Parse(Profile.GetValue("ShutterOpenTime", "30"));
+                set => Profile.WriteValue("ShutterOpenTime", value.ToString());
+            }
+        }
+
+
+
+
+
+
+
+
+        // public static int ParkAzimuth { get; set; } = 0;    // the three lines here go with setup.razor
+        // public static bool SlavingEnabled { get; set; } = false;
+        // public static int ShutterOpenTime { get; set; } = 30;
 
 
         internal static bool AutoStartBrowser
