@@ -12,12 +12,12 @@ namespace GowerDome2025.DeviceAccess
 
     public class GowerDome : IDomeV3
     {
-        internal static string control_BoxComPort;   // note this will contain e.g. COM8
-        internal static string ShutterComPort;       // note this will contain e.g. COM12
+        internal static string? control_BoxComPort;   // note this will contain e.g. COM8
+        internal static string? ShutterComPort;       // note this will contain e.g. COM12
 
 
-        private SerialPort control_Box;   // serial port objects
-        private SerialPort pkShutter;
+        private SerialPort? control_Box;   // serial port objects
+        private SerialPort? pkShutter;
 
         private bool _connecting = false;
 
@@ -195,7 +195,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 try
                 {
-                    using (SerialPort testPort = new SerialPort(portName, 9600, Parity.None, 8, StopBits.One))
+                    using (SerialPort testPort = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One))
                     {
                         testPort.ReadTimeout = 500;
                         testPort.WriteTimeout = 500;
@@ -205,11 +205,11 @@ namespace GowerDome2025.DeviceAccess
                         testPort.DiscardOutBuffer();
 
                         testPort.WriteLine("controlbox");
-                        Thread.Sleep(200);
+                        Thread.Sleep(500);
                         string response = testPort.ReadLine().Trim().ToLower();
                         if (response == "controlbox")
                         {
-                            control_Box = new SerialPort(portName, 9600, Parity.None, 8, StopBits.One);
+                            control_Box = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One);
                             control_Box.Open();
                             continue;
                         }
@@ -221,7 +221,7 @@ namespace GowerDome2025.DeviceAccess
                         response = testPort.ReadLine().Trim().ToLower();
                         if (response == "shutter")
                         {
-                            pkShutter = new SerialPort(portName, 9600, Parity.None, 8, StopBits.One);
+                            pkShutter = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One);
                             pkShutter.Open();
                         }
                     }

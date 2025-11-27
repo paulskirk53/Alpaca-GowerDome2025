@@ -163,7 +163,7 @@
 </fieldset>
 <fieldset>
     <legend>Dome Driver Settings</legend>
-
+    <br />
     <label>Park Azimuth:</label>
     <input type="number" @bind="ParkAzimuth" min="0" max="360" />   // this 'binds' the fields to user defined properties such as ParkAzimuth, so if user changes UI value
                                                                     // that 'sets' the property, or if the code 'sets' the property it's reflected in the UI.
@@ -179,7 +179,14 @@
 
     <button @onclick="SaveDomeSettings" style="min-width:12ch;">Save</button>
     
-    
+    <button @onclick="CheckHardware">Identify MCU Ports</button>
+
+    <ul>
+        @foreach (var msg in HardwareMessages)
+        {
+            <li>@msg</li>
+        }
+    </ul>
 
 </fieldset>
 
@@ -193,7 +200,19 @@
     <button @onclick="Shutdown" style="min-width:12ch; vertical-align:middle;" disabled="@AllowShutdown">Shutdown</button>
 </fieldset>
 
-@code {
+
+
+
+@code{
+    private List<string> HardwareMessages = new();
+
+    private void CheckHardware()
+    {
+        HardwareMessages = ServerSettings.DomeSettings.IdentifyMCUPorts();
+    }
+
+    
+
     int ParkAzimuth { get; set; } = ServerSettings.DomeSettings.ParkAzimuth;
     bool SlavingEnabled { get; set; } = ServerSettings.DomeSettings.SlavingEnabled;
     int ShutterOpenTime { get; set; } = ServerSettings.DomeSettings.ShutterOpenTime;

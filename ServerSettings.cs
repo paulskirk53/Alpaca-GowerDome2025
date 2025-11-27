@@ -1,4 +1,5 @@
 ﻿using ASCOM.Alpaca;
+using System.IO.Ports;
 
 namespace GowerDome2025
 {
@@ -23,7 +24,7 @@ namespace GowerDome2025
                 Profile.WriteValue("Location", value.ToString());
             }
         }
-        public static string ControlBoxComPort { get; set; } = string.Empty;  // todo pk added this to initialise and persist the comport
+       // public static string ControlBoxComPort { get; set; } = string.Empty;  // todo pk added this to initialise and persist the comport
         //AI says it is possible save the setting like this in the driver.cs - ServerSettings.Save(); 
 
 
@@ -31,6 +32,7 @@ namespace GowerDome2025
         {
             internal static ASCOM.Tools.XMLProfile Profile = new ASCOM.Tools.XMLProfile(Program.DriverID, "Server");
 
+            // Existing settings
             public static int ParkAzimuth
             {
                 get => int.Parse(Profile.GetValue("ParkAzimuth", "0"));
@@ -48,18 +50,86 @@ namespace GowerDome2025
                 get => int.Parse(Profile.GetValue("ShutterOpenTime", "30"));
                 set => Profile.WriteValue("ShutterOpenTime", value.ToString());
             }
+
+            // New persisted COM port settings
+            public static string? ControlBoxComPort
+            {
+                get => Profile.GetValue("ControlBoxComPort", null);
+                private set => Profile.WriteValue("ControlBoxComPort", value ?? "");
+            }
+
+            public static string? ShutterComPort
+            {
+                get => Profile.GetValue("ShutterComPort", null);
+                private set => Profile.WriteValue("ShutterComPort", value ?? "");
+            }
+
+            /// <summary>
+            /// Scan COM ports, identify hardware, update persisted settings, and return status messages.
+            /// </summary>
+            public static List<string> IdentifyMCUPorts()
+            {
+                var messages = new List<string>();
+                string[] ports = SerialPort.GetPortNames()
+                                           .Where(p => p != "COM1")
+                                           .ToArray();
+
+                ControlBoxComPort = "";
+                ShutterComPort    = "";
+
+                foreach (string portName in ports)
+                {
+                    try
+                    {
+                        using (SerialPort testPort = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One))
+                        {
+                            messages.Add($"writing to port {portName}");
+                            testPort.ReadTimeout = 500;
+                            testPort.WriteTimeout = 500;
+                            testPort.Open();
+
+                            testPort.DiscardInBuffer();
+                            testPort.DiscardOutBuffer();
+
+                            testPort.Write("identify#");
+                            Thread.Sleep(500);
+
+                            string response = testPort.ReadTo("#").Trim().ToLower();
+
+                            if (response == "controlbox")
+                            {
+                                ControlBoxComPort = portName;
+                                messages.Add($"Control Box found on {portName}");
+                            }
+                            if (response == "shutter")
+                            {
+                                ShutterComPort = portName;
+                                messages.Add($"Shutter Radio found on {portName}");
+                            }
+
+                            if (!string.IsNullOrEmpty(ControlBoxComPort) && !string.IsNullOrEmpty(ShutterComPort))
+                            {
+                               // messages.Add($"Break on port {portName}");
+                                break;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        //messages.Add($"Error on port {portName}: {ex.Message}");
+                    }
+                }
+
+                if (string.IsNullOrEmpty(ControlBoxComPort))
+                { messages.Add("Control Box not found"); }
+                if (string.IsNullOrEmpty(ShutterComPort))
+                { messages.Add("Shutter Radio not found"); }
+
+                return messages;
+            }
         }
 
-
-
-
-
-
-
-
-        // public static int ParkAzimuth { get; set; } = 0;    // the three lines here go with setup.razor
-        // public static bool SlavingEnabled { get; set; } = false;
-        // public static int ShutterOpenTime { get; set; } = 30;
+ 
 
 
         internal static bool AutoStartBrowser
