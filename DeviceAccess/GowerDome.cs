@@ -18,7 +18,7 @@ namespace GowerDome2025.DeviceAccess
 
         private SerialPort? control_Box;   // serial port objects
         private SerialPort? pkShutter;
-
+        
         private bool _connecting = false;
 
 
@@ -37,8 +37,8 @@ namespace GowerDome2025.DeviceAccess
                     try
                     {
                         Connect();          
-                        connectedState = true;
-                        Connecting = false;
+                       // connectedState = true;   // these are set in connect()
+                       // Connecting = false;
                     }
                     catch 
                     {
@@ -157,11 +157,12 @@ namespace GowerDome2025.DeviceAccess
 
         public void Connect()
         {
-
+            // as identify ports is called in setup, all we have to do here is ensure control_box and PKshutter are not null
+            // there is no need to go through identifyconports() again
             try
             {
                 _connecting = true;
-                IdentifyMCUPorts(); // Scan and assign control_Box and pkShutter
+                //IdentifyMCUPorts(); // Scan and assign control_Box and pkShutter
 
                 if (control_Box == null || pkShutter == null)
                 {

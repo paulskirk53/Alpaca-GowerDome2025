@@ -208,14 +208,14 @@
 
     private void CheckHardware()
     {
-        HardwareMessages = ServerSettings.DomeSettings.IdentifyMCUPorts();
+        HardwareMessages = DomeSettings.IdentifyMCUPorts();
     }
 
     
 
-    int ParkAzimuth { get; set; } = ServerSettings.DomeSettings.ParkAzimuth;
-    bool SlavingEnabled { get; set; } = ServerSettings.DomeSettings.SlavingEnabled;
-    int ShutterOpenTime { get; set; } = ServerSettings.DomeSettings.ShutterOpenTime;
+    int ParkAzimuth { get; set; } = DomeSettings.ParkAzimuth;
+    bool SlavingEnabled { get; set; } = DomeSettings.SlavingEnabled;
+    int ShutterOpenTime { get; set; } = DomeSettings.ShutterOpenTime;
 
     bool Discovery
     {
@@ -376,10 +376,10 @@
     {
         try
         {
-            ServerSettings.DomeSettings.ParkAzimuth = ParkAzimuth;            // sets the property parkazimuth - ParkAzimuth setter in serversettings.domesettings 
+            DomeSettings.ParkAzimuth = ParkAzimuth;            // sets the property parkazimuth - ParkAzimuth setter in serversettings.domesettings 
                                                                               // writes to the XML profile to persist the azimuth value. Ditto values below
-            ServerSettings.DomeSettings.SlavingEnabled = SlavingEnabled;
-            ServerSettings.DomeSettings.ShutterOpenTime = ShutterOpenTime;
+            DomeSettings.SlavingEnabled = SlavingEnabled;
+            DomeSettings.ShutterOpenTime = ShutterOpenTime;
 
             DisplaySuccess("Dome Settings Saved");
         }
