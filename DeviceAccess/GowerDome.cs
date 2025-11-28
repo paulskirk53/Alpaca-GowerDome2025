@@ -12,8 +12,8 @@ namespace GowerDome2025.DeviceAccess
 
     public class GowerDome : IDomeV3
     {
-        internal static string? control_BoxComPort;   // note this will contain e.g. COM8
-        internal static string? ShutterComPort;       // note this will contain e.g. COM12
+        //internal static string? control_BoxComPort;   // note this will contain e.g. COM8
+       // internal static string? ShutterComPort;       // note this will contain e.g. COM12
 
 
         private SerialPort? control_Box;   // serial port objects
@@ -87,17 +87,17 @@ namespace GowerDome2025.DeviceAccess
 
         public bool CanFindHome => true; // throw new NotImplementedException();
 
-        public bool CanPark => throw new NotImplementedException();
+        public bool CanPark => true; //throw new NotImplementedException();
 
-        public bool CanSetAltitude => throw new NotImplementedException();
+        public bool CanSetAltitude => false;  //throw new NotImplementedException();
 
-        public bool CanSetAzimuth => throw new NotImplementedException();
+        public bool CanSetAzimuth => true; //throw new NotImplementedException();
 
-        public bool CanSetPark => throw new NotImplementedException();
+        public bool CanSetPark => true; //throw new NotImplementedException();
 
-        public bool CanSetShutter => throw new NotImplementedException();
+        public bool CanSetShutter => true; // throw new NotImplementedException();
 
-        public bool CanSlave => throw new NotImplementedException();
+        public bool CanSlave => false; //throw new NotImplementedException();
 
         public bool CanSyncAzimuth => true;
 
@@ -113,15 +113,15 @@ namespace GowerDome2025.DeviceAccess
             set { _connecting = value; }
         }
 
-        public string Description => "Gower Dome"; //
+        public string Description => "Alpaca driver for Gower Dome hardware"; //
 
-        public string DriverInfo => throw new NotImplementedException();
+        public string DriverInfo => "Gower Dome Alpaca driver first go at alpaca driver";  //throw new NotImplementedException(); todo
 
-        public string DriverVersion => throw new NotImplementedException();
+        public string DriverVersion => "1";  // throw new NotImplementedException(); todo
 
-        public short InterfaceVersion => throw new NotImplementedException();
+        public short InterfaceVersion => 1; // throw new NotImplementedException();
 
-        public string Name => throw new NotImplementedException();
+        public string Name => "Gower Dome 2025"; //throw new NotImplementedException();
 
         public IList<string> SupportedActions => throw new NotImplementedException();
 
@@ -163,7 +163,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 _connecting = true;
                 //IdentifyMCUPorts(); // Scan and assign control_Box and pkShutter
-
+                SetupPorts();
                 if (control_Box == null || pkShutter == null)
                 {
                     throw new InvalidOperationException("One or both MCUs could not be identified.");
@@ -187,6 +187,26 @@ namespace GowerDome2025.DeviceAccess
 
         }
 
+        // Assuming ServerSettings.ControlBoxComPort and ServerSettings.ShutterComPort
+        // are populated by IdentifyMCUPorts()
+
+        private void SetupPorts()
+        {
+            // Control Box
+            if (!string.IsNullOrEmpty(DomeSettings.ControlBoxComPort))
+            {
+                control_Box = new SerialPort(DomeSettings.ControlBoxComPort, 19200, Parity.None, 8, StopBits.One);
+                control_Box.Open();
+                // optional: configure timeouts, event handlers, etc.
+            }
+
+            // Shutter
+            if (!string.IsNullOrEmpty(DomeSettings.ShutterComPort))
+            {
+                pkShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
+                pkShutter.Open();
+            }
+        }
 
         private void IdentifyMCUPorts()
         {
@@ -244,6 +264,7 @@ namespace GowerDome2025.DeviceAccess
 
                 pkShutter.Close();
                 connectedState = false;
+                Dispose();
             }
             catch
             {
@@ -255,7 +276,26 @@ namespace GowerDome2025.DeviceAccess
 
         public void Dispose()
         {
-            throw new NotImplementedException();
+            if (pkShutter != null)
+            {
+                if (pkShutter.IsOpen)
+                    pkShutter.Close();   // closes the port safely
+
+                pkShutter.Dispose();     // releases unmanaged resources
+                pkShutter = null;        // optional: clear reference
+            }
+
+            if (control_Box != null)
+            {
+                if (control_Box.IsOpen)
+                    control_Box.Close();   // closes the port safely
+
+                control_Box.Dispose();     // releases unmanaged resources
+                control_Box = null;        // optional: clear reference
+            }
+
+            control_Box?.Dispose();
+            // throw new NotImplementedException();
         }
 
         public void FindHome()

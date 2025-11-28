@@ -3,7 +3,7 @@
 namespace GowerDome2025
 {
     
-    
+    //this is a file/ class I created for settings releated to Dome hardware.
 
         internal static class DomeSettings
         {
@@ -51,7 +51,7 @@ namespace GowerDome2025
                                            .Where(p => p != "COM1")
                                            .ToArray();
 
-                ControlBoxComPort = "";
+                ControlBoxComPort = ""; // using this initialiser rather than null because of get / set in definition. Null does not work
                 ShutterComPort = "";
 
                 foreach (string portName in ports)
