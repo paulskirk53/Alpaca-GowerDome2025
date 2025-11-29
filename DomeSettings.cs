@@ -15,8 +15,13 @@ namespace GowerDome2025
                 get => int.Parse(Profile.GetValue("ParkAzimuth", "0"));
                 set => Profile.WriteValue("ParkAzimuth", value.ToString());
             }
+        public static int HomeAzimuth
+        {
+            get => int.Parse(Profile.GetValue("HomeAzimuth", "0"));
+            set => Profile.WriteValue("HomeAzimuth", value.ToString());
+        }
 
-            public static bool SlavingEnabled
+        public static bool SlavingEnabled
             {
                 get => bool.Parse(Profile.GetValue("SlavingEnabled", "false"));
                 set => Profile.WriteValue("SlavingEnabled", value.ToString());

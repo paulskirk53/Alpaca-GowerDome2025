@@ -1,10 +1,11 @@
-﻿using System;
+﻿using ASCOM.Common.Alpaca;
+using ASCOM.Common.DeviceInterfaces;
+using System;
 using System.Collections.Generic;
+using System.IO.Ports;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ASCOM.Common.DeviceInterfaces;
-using System.IO.Ports;
 
 
 namespace GowerDome2025.DeviceAccess
@@ -12,13 +13,13 @@ namespace GowerDome2025.DeviceAccess
 
     public class GowerDome : IDomeV3
     {
-        //internal static string? control_BoxComPort;   // note this will contain e.g. COM8
-       // internal static string? ShutterComPort;       // note this will contain e.g. COM12
+
+        private SerialPort control_Box = new SerialPort("COM3", 9600);   // see comment below
+        private SerialPort pkShutter = new SerialPort("COM3", 9600);    // this is to satisfy the silly C# compiler. COM3 is never used. The port will be reassigned in identifycomports()
 
 
-        private SerialPort? control_Box;   // serial port objects
-        private SerialPort? pkShutter;
-        
+        private double lastAzimuth = 27;
+        private bool lastSlewing = false;
         private bool _connecting = false;
 
 
@@ -36,13 +37,13 @@ namespace GowerDome2025.DeviceAccess
                     Connecting = true;
                     try
                     {
-                        Connect();          
-                       // connectedState = true;   // these are set in connect()
-                       // Connecting = false;
+                        Connect();
+                        // connectedState = true;   // these are set in connect()
+                        // Connecting = false;
                     }
-                    catch 
+                    catch
                     {
-                        connectedState= false;
+                        connectedState = false;
                         Connecting = false;
                     }
 
@@ -67,23 +68,107 @@ namespace GowerDome2025.DeviceAccess
             }
         }
 
-        
 
-        
-
-
+        public List<StateValue> DeviceState => new List<StateValue>();
+        // was  public List<StateValue> DeviceState => throw new NotImplementedException();
 
 
+        public double Altitude
+        {
+            get
+            {
+                // If your dome doesn’t move vertically, just return 0.0
+                return 0.0;
+            }
+        }
 
-    public List<StateValue> DeviceState => throw new NotImplementedException();
 
-        public double Altitude => throw new NotImplementedException();
 
-        public bool AtHome => throw new NotImplementedException();
 
-        public bool AtPark => throw new NotImplementedException();
 
-        public double Azimuth => throw new NotImplementedException();
+        // public double Altitude = 0.0;  // => throw new NotImplementedException();
+
+        public bool AtHome //=> throw new NotImplementedException();
+        {
+            get
+            {
+
+                double CurrentAzimuth = Azimuth;
+                //pk todo remove hardcoding of Home position below - done
+
+                if (Math.Abs((int)CurrentAzimuth - DomeSettings.HomeAzimuth) <= 5)   // care - assumes a fixed sensor position of 270.0 degrees
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+
+                //  throw new ASCOM.PropertyNotImplementedException("AtHome", false);
+            }
+        }
+
+        public bool AtPark   //=> throw new NotImplementedException();
+        {
+            get
+            {
+
+                // check if the current dome azimuth is = to ParkAzimuth
+                double CurrentAzimuth = Azimuth;     // note Azimuth is a dome property - see code for it.
+
+
+                if (Math.Abs((int)CurrentAzimuth - DomeSettings.ParkAzimuth) <= 5)
+                    return true;
+                else
+                    return false;
+
+            }
+        }
+
+        public double Azimuth
+        {
+
+            get
+            {
+                try
+                {
+                    control_Box.DiscardInBuffer();
+                    control_Box.DiscardOutBuffer();
+                    control_Box.Write("AZ#");
+                    control_Box.ReadTimeout = 10000;
+
+                    // Wait until some data arrives
+                    while (control_Box.BytesToRead == 0)
+                    {
+                        Thread.Sleep(10);
+                    }
+
+                    
+                    string response = control_Box.ReadTo("#").Replace("#", "");
+                    if (double.TryParse(response, out double az))
+                    {
+                        lastAzimuth = az;
+                        return az;
+                    }
+                    else
+                    {
+                        return lastAzimuth;
+                    }
+
+                }
+                catch (TimeoutException)
+                {
+                    return lastAzimuth; // return last known value
+                }
+                catch (OperationCanceledException)
+                {
+                    return lastAzimuth; // handle cancellation gracefully
+                }
+            }
+            //return double.NaN;
+        }
+
 
         public bool CanFindHome => true; // throw new NotImplementedException();
 
@@ -101,11 +186,103 @@ namespace GowerDome2025.DeviceAccess
 
         public bool CanSyncAzimuth => true;
 
-        public ShutterState ShutterStatus => throw new NotImplementedException();
+        public ShutterState ShutterStatus //=> throw new NotImplementedException(); todo this enumeration is different from the dll based implementation
+        {
+            get
+            {
+                try
+                {
+                    pkShutter.ReadTimeout = 1000;
 
-        public bool Slaved { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-        public bool Slewing => throw new NotImplementedException();
+                    control_Box.DiscardOutBuffer();
+                    pkShutter.Write("SS#");                            // send the command to trigger the status response from the arduino
+
+                    string state = pkShutter.ReadTo("#");
+                    state = state.Replace("#", "");
+
+                    switch (state)
+                    {
+
+                        case "open":
+
+                            return ShutterState.Open;  //shutterOpen; //Open =0 , Closed =1, Opening=2, Closing - 3,Error =4
+
+                        case "opening":
+                            return ShutterState.Opening;
+
+                        case "closed":
+                            return ShutterState.Closed;
+
+                        case "closing":
+                            return ShutterState.Closing;
+                        default:
+                            return ShutterState.Error;     // runs if there's no case match
+
+                    }
+                }
+                catch
+                {
+                    return ShutterState.Error;
+                }
+
+            }
+
+
+
+        }
+
+        public bool Slaved //{ get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+
+        {
+            get => false;
+            set { /* ignore */ }
+        }
+
+
+        public bool Slewing //=> throw new NotImplementedException();
+        {
+            get
+            {         //todo 22/11/25 - need to remodel to add a control_box.receievetimout=4 and add the receiveterminated code into the try block
+                try
+                {
+                    control_Box.DiscardOutBuffer();
+                    control_Box.DiscardInBuffer(); // this cured the receive problem from Arduino             
+                    control_Box.ReadTimeout = 1000;
+                    control_Box.Write("SL#");                 //  accommodates the SL process in the control box mcu
+
+                    string SL_response = control_Box.ReadTo("#").Trim();     // ReceiveTerminated("#");            // read what's sent back
+                    SL_response = SL_response.Replace("#", "");                       // remove the # mark
+                    if (SL_response == "Moving")                                      // set this condition properly.
+                    {
+                        lastSlewing = true;
+                        return true;
+
+                    }
+                    else
+                    {
+                        lastSlewing = false;
+                        return false;
+                    }
+                }
+
+
+                catch (TimeoutException)
+                {
+                    return lastSlewing; // return last known value
+                }
+                catch (OperationCanceledException)
+                {
+                    return lastSlewing; // handle cancellation gracefully
+                }
+            }
+
+        }
+
+
+
+
 
         public bool Connecting
         {
@@ -123,11 +300,21 @@ namespace GowerDome2025.DeviceAccess
 
         public string Name => "Gower Dome 2025"; //throw new NotImplementedException();
 
-        public IList<string> SupportedActions => throw new NotImplementedException();
+        public IList<string> SupportedActions => new List<string>();   // template had public IList<string> SupportedActions => throw new NotImplementedException();
 
         public void AbortSlew()
         {
-            throw new NotImplementedException();
+            try
+            {
+                control_Box.DiscardOutBuffer();
+                control_Box.Write("ES#");    // halt dome slewing
+                pkShutter.Write("ES#");      // halt shutter and close it safely if open or part open
+            }
+            catch
+            {// do nothing in event of failure todo this needs better catch
+
+            }
+            //throw new NotImplementedException();
         }
 
         public string Action(string actionName, string actionParameters)
@@ -137,7 +324,18 @@ namespace GowerDome2025.DeviceAccess
 
         public void CloseShutter()
         {
-            throw new NotImplementedException();
+            try
+            {
+                control_Box.DiscardOutBuffer();
+                control_Box.Write("CS#");    // halt dome slewing
+
+            }
+            catch
+            {// do nothing in event of failure todo this needs better catch
+
+            }
+
+            // throw new NotImplementedException();
         }
 
         public void CommandBlind(string command, bool raw = false)
@@ -162,8 +360,9 @@ namespace GowerDome2025.DeviceAccess
             try
             {
                 _connecting = true;
-                //IdentifyMCUPorts(); // Scan and assign control_Box and pkShutter
+
                 SetupPorts();
+
                 if (control_Box == null || pkShutter == null)
                 {
                     throw new InvalidOperationException("One or both MCUs could not be identified.");
@@ -171,14 +370,14 @@ namespace GowerDome2025.DeviceAccess
 
                 connectedState = true;
                 _connecting = false;
-               // LogMessage("Connect", "MCUs successfully connected.");
+                // LogMessage("Connect", "MCUs successfully connected.");
             }
-            catch (Exception ex)
+            catch
             {
                 connectedState = false;
                 _connecting = false;
                 //LogMessage("Connect", $"Connection failed: {ex.Message}");
-              //  throw new AlpacaException(1279, "Failed to connect to MCUs: " + ex.Message);
+                //  throw new AlpacaException(1279, "Failed to connect to MCUs: " + ex.Message);
             }
 
 
@@ -193,7 +392,7 @@ namespace GowerDome2025.DeviceAccess
         private void SetupPorts()
         {
             // Control Box
-            if (!string.IsNullOrEmpty(DomeSettings.ControlBoxComPort))
+            if (!string.IsNullOrEmpty(DomeSettings.ControlBoxComPort))  // we know what port is in use from Identifycomports()
             {
                 control_Box = new SerialPort(DomeSettings.ControlBoxComPort, 19200, Parity.None, 8, StopBits.One);
                 control_Box.Open();
@@ -201,14 +400,14 @@ namespace GowerDome2025.DeviceAccess
             }
 
             // Shutter
-            if (!string.IsNullOrEmpty(DomeSettings.ShutterComPort))
+            if (!string.IsNullOrEmpty(DomeSettings.ShutterComPort))  // we know what port is in use from Identifycomports()
             {
                 pkShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
                 pkShutter.Open();
             }
         }
 
-        private void IdentifyMCUPorts()
+        private void IdentifyMCUPorts()  // this method not used anywhere todo remove
         {
             string[] ports = SerialPort.GetPortNames();
 
@@ -249,11 +448,12 @@ namespace GowerDome2025.DeviceAccess
                 }
                 catch { /* Ignore errors during scanning */ }
             }
+
         }
 
 
 
-       
+
 
         public void Disconnect()
         {
@@ -294,28 +494,67 @@ namespace GowerDome2025.DeviceAccess
                 control_Box = null;        // optional: clear reference
             }
 
-            control_Box?.Dispose();
+
             // throw new NotImplementedException();
         }
 
         public void FindHome()
         {
-            throw new NotImplementedException();
+            // we need to implement this for the remote Observatory because if a power or MCU reset happens, we lose position
+            //findhome 'scans' for the fixed azimuth by slewing the dome and checking if the findhome sensor is activated
+            //if so, the MCU azimuth is set to that correct azimuth value associated with the sensor.
+
+
+            try
+            {
+                control_Box.DiscardOutBuffer();
+
+                control_Box.Write("FH#");
+            }
+            catch
+            {
+                //
+                control_Box.DiscardOutBuffer();
+
+                control_Box.Write("FH#");
+                // log
+
+            }
+
         }
 
         public void OpenShutter()
         {
+
+            try
+            {
+                control_Box.DiscardOutBuffer();
+                control_Box.Write("OS#");    // halt dome slewing
+
+            }
+            catch
+            {// do nothing in event of failure todo this needs better catch
+
+            }
+
             throw new NotImplementedException();
         }
 
         public void Park()
         {
-            throw new NotImplementedException();
+            if (!AtPark)                     //if we're already there, do nothing
+            {
+                SlewToAzimuth(DomeSettings.ParkAzimuth);
+            }
+            // throw new NotImplementedException();
         }
 
         public void SetPark()
         {
-            throw new NotImplementedException();
+
+            // ParkAzimuth is in domsettings as a property, which writes to the xml profile so use that
+            DomeSettings.ParkAzimuth = (int)Azimuth; //this writes the current azimuth to the xml profile
+                                                     //            throw new NotImplementedException();
         }
 
         public void SlewToAltitude(double Altitude)
@@ -325,12 +564,46 @@ namespace GowerDome2025.DeviceAccess
 
         public void SlewToAzimuth(double Azimuth)
         {
-            throw new NotImplementedException();
+
+            try
+            {
+                control_Box.DiscardOutBuffer();
+
+                control_Box.Write("SA" + Azimuth.ToString("0.##") + "#");
+            }
+            catch
+            {
+
+                control_Box.DiscardOutBuffer();
+
+                control_Box.Write("SA" + Azimuth.ToString("0.##") + "#");
+                // log
+                //tl.LogMessage("Slew to azimuth - attempt to send CL and SA for angle > 180", ex.ToString());
+            }
+
+
+
+            //throw new NotImplementedException();
         }
 
         public void SyncToAzimuth(double Azimuth)
         {
+
+            try
+            {
+                control_Box.DiscardOutBuffer();
+                control_Box.Write("STA" + Azimuth.ToString("0.##") + "#");
+            }
+            catch
+            {
+                control_Box.DiscardOutBuffer();
+                control_Box.Write("STA" + Azimuth.ToString("0.##") + "#");
+            }
+
+
             throw new NotImplementedException();
         }
+
     }
+
 }
