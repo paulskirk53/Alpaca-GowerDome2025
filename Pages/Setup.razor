@@ -164,9 +164,18 @@
 <fieldset>
     <legend>Dome Driver Settings</legend>
     <br />
+
+    <ul style="margin:0; padding:0; list-style:none">
+        <li>Shutter MCU last found on port : @DomeSettings.ShutterComPort</li>     <!-- render the known port names -->
+        <li>Control Box last found on port : @DomeSettings.ControlBoxComPort</li>
+    </ul>
+
+
+    <br />
+
     <label>Park Azimuth:</label>
-    <input type="number" @bind="ParkAzimuth" min="0" max="360" />   // this 'binds' the fields to user defined properties such as ParkAzimuth, so if user changes UI value
-                                                                    // that 'sets' the property, or if the code 'sets' the property it's reflected in the UI.
+    <input type="number" @bind="ParkAzimuth" min="0" max="360" />  <!-- this 'binds' the fields to user defined properties such as ParkAzimuth, so if user changes UI value -->
+    <!-- that 'sets' the property, or if the code 'sets' the property it's reflected in the UI. -->
     <br />
 
     <label>Enable Slaving:</label>

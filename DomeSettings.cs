@@ -60,7 +60,7 @@ namespace GowerDome2025
                     {
                         using (SerialPort testPort = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One))
                         {
-                            messages.Add($"writing to port {portName}");
+                            //messages.Add($"writing to port {portName}");
                             testPort.ReadTimeout = 500;
                             testPort.WriteTimeout = 500;
                             testPort.Open();
