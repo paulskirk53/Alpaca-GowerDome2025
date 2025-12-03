@@ -38,6 +38,7 @@ namespace GowerDome2025.DeviceAccess
                     try
                     {
                         Connect();
+                        Task.Run(() => StartPolling());
                         // connectedState = true;   // these are set in connect()
                         // Connecting = false;
                     }
@@ -131,44 +132,38 @@ namespace GowerDome2025.DeviceAccess
 
             get
             {
-                try
-                {
-                    control_Box.DiscardInBuffer();
-                    control_Box.DiscardOutBuffer();
-                    control_Box.Write("AZ#");
-                    control_Box.ReadTimeout = 10000;
-
-                    // Wait until some data arrives
-                    while (control_Box.BytesToRead == 0)
-                    {
-                        Thread.Sleep(10);
-                    }
-
-                    
-                    string response = control_Box.ReadTo("#").Replace("#", "");
-                    if (double.TryParse(response, out double az))
-                    {
-                        lastAzimuth = az;
-                        return az;
-                    }
-                    else
-                    {
-                        return lastAzimuth;
-                    }
-
-                }
-                catch (TimeoutException)
-                {
-                    return lastAzimuth; // return last known value
-                }
-                catch (OperationCanceledException)
-                {
-                    return lastAzimuth; // handle cancellation gracefully
-                }
+                return lastAzimuth;
             }
-            //return double.NaN;
+            
         }
 
+        // Background polling task
+        private Timer pollTimer;
+
+        public void StartPolling()
+        {
+            pollTimer = new Timer(_ =>
+            {
+                try
+                {
+
+                    if (control_Box == null || !control_Box.IsOpen)
+                        return; // skip until connected
+                    control_Box.DiscardInBuffer();
+                    control_Box.Write("AZ#");
+                    string response = control_Box.ReadTo("#");
+                    if (double.TryParse(response, out double az))
+                        lastAzimuth = az;
+                   //
+                }
+                catch 
+                { /* ignore errors */
+                  
+                }
+            }, null, 0, 1500); // poll every 1.5 second
+        }
+
+       
 
         public bool CanFindHome => true; // throw new NotImplementedException();
 
@@ -198,6 +193,9 @@ namespace GowerDome2025.DeviceAccess
                     control_Box.DiscardOutBuffer();
                     pkShutter.Write("SS#");                            // send the command to trigger the status response from the arduino
 
+                    
+
+
                     string state = pkShutter.ReadTo("#");
                     state = state.Replace("#", "");
 
@@ -216,6 +214,7 @@ namespace GowerDome2025.DeviceAccess
 
                         case "closing":
                             return ShutterState.Closing;
+
                         default:
                             return ShutterState.Error;     // runs if there's no case match
 
@@ -241,7 +240,7 @@ namespace GowerDome2025.DeviceAccess
         }
 
 
-        public bool Slewing //=> throw new NotImplementedException();
+        public bool Slewing //  get the slewing status of the dome
         {
             get
             {         //todo 22/11/25 - need to remodel to add a control_box.receievetimout=4 and add the receiveterminated code into the try block
@@ -251,6 +250,9 @@ namespace GowerDome2025.DeviceAccess
                     control_Box.DiscardInBuffer(); // this cured the receive problem from Arduino             
                     control_Box.ReadTimeout = 1000;
                     control_Box.Write("SL#");                 //  accommodates the SL process in the control box mcu
+
+                    
+
 
                     string SL_response = control_Box.ReadTo("#").Trim();     // ReceiveTerminated("#");            // read what's sent back
                     SL_response = SL_response.Replace("#", "");                       // remove the # mark
@@ -296,7 +298,7 @@ namespace GowerDome2025.DeviceAccess
 
         public string DriverVersion => "1";  // throw new NotImplementedException(); todo
 
-        public short InterfaceVersion => 1; // throw new NotImplementedException();
+        public short InterfaceVersion => 3; // throw new NotImplementedException();
 
         public string Name => "Gower Dome 2025"; //throw new NotImplementedException();
 
@@ -370,6 +372,8 @@ namespace GowerDome2025.DeviceAccess
 
                 connectedState = true;
                 _connecting = false;
+             //  StartPolling();
+
                 // LogMessage("Connect", "MCUs successfully connected.");
             }
             catch
@@ -396,6 +400,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 control_Box = new SerialPort(DomeSettings.ControlBoxComPort, 19200, Parity.None, 8, StopBits.One);
                 control_Box.Open();
+                Thread.Sleep(500);
                 // optional: configure timeouts, event handlers, etc.
             }
 
@@ -404,6 +409,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 pkShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
                 pkShutter.Open();
+                Thread.Sleep(500);
             }
         }
 
@@ -553,8 +559,8 @@ namespace GowerDome2025.DeviceAccess
         {
 
             // ParkAzimuth is in domsettings as a property, which writes to the xml profile so use that
-            DomeSettings.ParkAzimuth = (int)Azimuth; //this writes the current azimuth to the xml profile
-                                                     //            throw new NotImplementedException();
+            DomeSettings.ParkAzimuth = (int)Azimuth; //this writes the current azimuth to the xml profile yes
+            //ServerSettings.Profile.WriteValue("ParkAzimuth", Azimuth.ToString());                                        //   save the park azimuth in xml profile store
         }
 
         public void SlewToAltitude(double Altitude)

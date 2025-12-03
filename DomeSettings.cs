@@ -7,7 +7,8 @@ namespace GowerDome2025
 
         internal static class DomeSettings
         {
-            internal static ASCOM.Tools.XMLProfile Profile = new ASCOM.Tools.XMLProfile(Program.DriverID, "Server");
+       
+        internal static ASCOM.Tools.XMLProfile Profile = new ASCOM.Tools.XMLProfile(Program.DriverID, "Server");
 
             // Existing settings
             public static int ParkAzimuth
@@ -69,14 +70,14 @@ namespace GowerDome2025
                             testPort.ReadTimeout = 500;
                             testPort.WriteTimeout = 500;
                             testPort.Open();
-
+                            Thread.Sleep(500);             // required setup time for mcu with bootloader
                             testPort.DiscardInBuffer();
                             testPort.DiscardOutBuffer();
 
                             testPort.Write("identify#");
-                            Thread.Sleep(500);
 
-                            string response = testPort.ReadTo("#").Trim().ToLower();
+                                            
+                        string response = testPort.ReadTo("#").Trim().ToLower();
 
                             if (response == "controlbox")
                             {

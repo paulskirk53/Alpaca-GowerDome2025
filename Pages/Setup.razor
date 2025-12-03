@@ -173,21 +173,21 @@
 
     <br />
 
-    <label>Park Azimuth:</label>
-    <input type="number" @bind="ParkAzimuth" min="0" max="360" />  <!-- this 'binds' the fields to user defined properties such as ParkAzimuth, so if user changes UI value -->
-    <!-- that 'sets' the property, or if the code 'sets' the property it's reflected in the UI. -->
-    <br />
+    <EditForm Model="@Model">
+        <label>Park Azimuth:</label>
+        <InputNumber @bind-Value="Model.ParkAzimuth" Min="0" Max="360" />
+        <br />
 
-    <label>Enable Slaving:</label>
-    <input type="checkbox" @bind="SlavingEnabled" />
-    <br />
+        <label>Enable Slaving:</label>
+        <InputCheckbox @bind-Value="Model.SlavingEnabled" />
+        <br />
 
-    <label>Shutter Open Time (seconds):</label>
-    <input type="number" @bind="ShutterOpenTime" min="1" max="120" />
-    <br />
+        <label>Shutter Open Time (seconds):</label>
+        <InputNumber @bind-Value="Model.ShutterOpenTime" Min="1" Max="120" />
+        <br />
+    </EditForm>
 
-    <button @onclick="SaveDomeSettings" style="min-width:12ch;">Save</button>
-    
+
     <button @onclick="CheckHardware">Identify MCU Ports</button>
 
     <ul>
@@ -213,6 +213,9 @@
 
 
 @code{
+   
+   
+
     private List<string> HardwareMessages = new();
 
     private void CheckHardware()
@@ -220,11 +223,29 @@
         HardwareMessages = DomeSettings.IdentifyMCUPorts();
     }
 
-    
+    private DomeSettingsWrapper Model = new();
 
-    int ParkAzimuth { get; set; } = DomeSettings.ParkAzimuth;
-    bool SlavingEnabled { get; set; } = DomeSettings.SlavingEnabled;
-    int ShutterOpenTime { get; set; } = DomeSettings.ShutterOpenTime;
+    public class DomeSettingsWrapper
+    {
+        public int ParkAzimuth
+        {
+            get => DomeSettings.ParkAzimuth;
+            set => DomeSettings.ParkAzimuth = value;
+        }
+
+        public bool SlavingEnabled
+        {
+            get => DomeSettings.SlavingEnabled;
+            set => DomeSettings.SlavingEnabled = value;
+        }
+
+        public int ShutterOpenTime
+        {
+            get => DomeSettings.ShutterOpenTime;
+            set => DomeSettings.ShutterOpenTime = value;
+        }
+    }
+
 
     bool Discovery
     {
@@ -381,22 +402,22 @@
         }
     }
 
-    void SaveDomeSettings()  //pk with AI
-    {
-        try
-        {
-            DomeSettings.ParkAzimuth = ParkAzimuth;            // sets the property parkazimuth - ParkAzimuth setter in serversettings.domesettings 
-                                                                              // writes to the XML profile to persist the azimuth value. Ditto values below
-            DomeSettings.SlavingEnabled = SlavingEnabled;
-            DomeSettings.ShutterOpenTime = ShutterOpenTime;
+//    void SaveDomeSettings()  //pk with AI
+  //  {
+    //    try
+      //  {
+        //    DomeSettings.ParkAzimuth = ParkAzimuth;            // sets the property parkazimuth - ParkAzimuth setter in serversettings.domesettings 
+          //                                                                    // writes to the XML profile to persist the azimuth value. Ditto values below
+ //           DomeSettings.SlavingEnabled = SlavingEnabled;
+   //         DomeSettings.ShutterOpenTime = ShutterOpenTime;
 
-            DisplaySuccess("Dome Settings Saved");
-        }
-        catch (Exception ex)
-        {
-            DisplayError($"Failed to save dome settings: {ex.Message}");
-        }
-    }
+     //       DisplaySuccess("Dome Settings Saved");
+       // }
+        //catch (Exception ex)
+ //       {
+   //         DisplayError($"Failed to save dome settings: {ex.Message}");
+     //   }
+    //}
 
 
     
