@@ -142,14 +142,14 @@ namespace GowerDome2025.DeviceAccess
 
         public void StartPolling()
         {
-            pollTimer = new Timer(_ =>
+            pollTimer = new Timer(_ =>    // this is a timer which runs in the background to poll the azimuth value. it runs in a separate thread to avoid blocking azimuth calls
             {
                 try
                 {
 
                     if (control_Box == null || !control_Box.IsOpen)
                         return; // skip until connected
-                    control_Box.DiscardInBuffer();
+                    //control_Box.DiscardInBuffer();
                     control_Box.Write("AZ#");
                     string response = control_Box.ReadTo("#");
                     if (double.TryParse(response, out double az))
