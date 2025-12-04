@@ -39,6 +39,7 @@ namespace GowerDome2025.DeviceAccess
                     {
                         Connect();
                         Task.Run(() => StartPolling());
+                        Task.Run(() => StartShutterPolling());
                         // connectedState = true;   // these are set in connect()
                         // Connecting = false;
                     }
@@ -181,53 +182,58 @@ namespace GowerDome2025.DeviceAccess
 
         public bool CanSyncAzimuth => true;
 
-        public ShutterState ShutterStatus //=> throw new NotImplementedException(); todo this enumeration is different from the dll based implementation
+
+        // Background polling task for shutter state
+        private Timer shutterPollTimer;
+        private ShutterState lastShutterState = ShutterState.Error;
+
+        public void StartShutterPolling()
         {
-            get
+            shutterPollTimer = new Timer(_ =>
             {
                 try
                 {
+                    if (pkShutter == null || !pkShutter.IsOpen)
+                        return; // skip until connected
+
                     pkShutter.ReadTimeout = 1000;
+                    pkShutter.Write("SS#");               // request shutter state
+                    string response = pkShutter.ReadTo("#").Replace("#", "");
 
-
-                    control_Box.DiscardOutBuffer();
-                    pkShutter.Write("SS#");                            // send the command to trigger the status response from the arduino
-
-                    
-
-
-                    string state = pkShutter.ReadTo("#");
-                    state = state.Replace("#", "");
-
-                    switch (state)
+                    switch (response)
                     {
-
                         case "open":
-
-                            return ShutterState.Open;  //shutterOpen; //Open =0 , Closed =1, Opening=2, Closing - 3,Error =4
-
+                            lastShutterState = ShutterState.Open;
+                            break;
                         case "opening":
-                            return ShutterState.Opening;
-
+                            lastShutterState = ShutterState.Opening;
+                            break;
                         case "closed":
-                            return ShutterState.Closed;
-
+                            lastShutterState = ShutterState.Closed;
+                            break;
                         case "closing":
-                            return ShutterState.Closing;
-
+                            lastShutterState = ShutterState.Closing;
+                            break;
                         default:
-                            return ShutterState.Error;     // runs if there's no case match
-
+                            lastShutterState = ShutterState.Error;
+                            break;
                     }
                 }
                 catch
                 {
-                    return ShutterState.Error;
+                    // if anything goes wrong, mark as error but don’t block
+                    lastShutterState = ShutterState.Error;
                 }
+            }, null, 0, 2000); // poll every 2 seconds
+        }
+
+        public ShutterState ShutterStatus 
+        {
+            get
+            {
+                return lastShutterState;
 
             }
-
-
 
         }
 
@@ -531,20 +537,44 @@ namespace GowerDome2025.DeviceAccess
 
         public void OpenShutter()
         {
+            const string command = "OS#";
+            const int maxRetries = 3;
+            int attempt = 0;
 
-            try
+            while (attempt < maxRetries)
             {
-                control_Box.DiscardOutBuffer();
-                control_Box.Write("OS#");    // halt dome slewing
+                try
+                {
+                    if (control_Box == null)
+                    {
+                        throw new InvalidOperationException("Control box not initialized.");
+                    }
+                    if (!control_Box.IsOpen)
+                    {
+                        control_Box.Open();
 
+                    }
+
+                    control_Box.WriteTimeout = 3000;
+                    control_Box.Write(command);
+                }
+                catch (Exception ex)
+                {
+                    
+                }
+                attempt++;
+
+
+                if (attempt >= maxRetries)
+                {
+                    // escalate after retries exhausted
+                    
+                }
+
+                System.Threading.Thread.Sleep(200); // brief pause before retry
             }
-            catch
-            {// do nothing in event of failure todo this needs better catch
-
-            }
-
-            throw new NotImplementedException();
         }
+
 
         public void Park()
         {
