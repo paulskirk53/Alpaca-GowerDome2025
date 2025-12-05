@@ -70,13 +70,13 @@ namespace GowerDome2025
                             testPort.ReadTimeout = 500;
                             testPort.WriteTimeout = 500;
                             testPort.Open();
-                            Thread.Sleep(500);             // required setup time for mcu with bootloader
+                            Thread.Sleep(1500);             // required setup time for mcu with bootloader
                             testPort.DiscardInBuffer();
                             testPort.DiscardOutBuffer();
 
                             testPort.Write("identify#");
+                            Thread.Sleep(500);
 
-                                            
                         string response = testPort.ReadTo("#").Trim().ToLower();
 
                             if (response == "controlbox")

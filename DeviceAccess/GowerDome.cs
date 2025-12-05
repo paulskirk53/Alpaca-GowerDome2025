@@ -39,7 +39,7 @@ namespace GowerDome2025.DeviceAccess
                     {
                         Connect();
                         Task.Run(() => StartPolling());
-                        Task.Run(() => StartShutterPolling());
+                      //  Task.Run(() => StartShutterPolling());
                         // connectedState = true;   // these are set in connect()
                         // Connecting = false;
                     }
@@ -95,7 +95,7 @@ namespace GowerDome2025.DeviceAccess
             get
             {
 
-                double CurrentAzimuth = Azimuth;
+                double CurrentAzimuth = lastAzimuth;
                 //pk todo remove hardcoding of Home position below - done
 
                 if (Math.Abs((int)CurrentAzimuth - DomeSettings.HomeAzimuth) <= 5)   // care - assumes a fixed sensor position of 270.0 degrees
@@ -152,6 +152,7 @@ namespace GowerDome2025.DeviceAccess
                         return; // skip until connected
                     //control_Box.DiscardInBuffer();
                     control_Box.Write("AZ#");
+                    Thread.Sleep(200);
                     string response = control_Box.ReadTo("#");
                     if (double.TryParse(response, out double az))
                         lastAzimuth = az;
@@ -193,30 +194,28 @@ namespace GowerDome2025.DeviceAccess
             {
                 try
                 {
-                    if (pkShutter == null || !pkShutter.IsOpen)
-                        return; // skip until connected
+                    //  if (pkShutter == null)      // || !pkShutter.IsOpen)
+                    //    return; // skip until connected
+                    if (!pkShutter.IsOpen)
+                    {
+                        pkShutter.Open();
+                        Thread.Sleep(1500);
+                    }
+                    pkShutter.ReadTimeout = 1500;
+                   // pkShutter.DiscardInBuffer();
+                   // pkShutter.DiscardOutBuffer();
+                    pkShutter.Write("SS#");
 
-                    pkShutter.ReadTimeout = 1000;
-                    pkShutter.Write("SS#");               // request shutter state
-                    string response = pkShutter.ReadTo("#").Replace("#", "");
-
+                    Thread.Sleep(200);                    // if arduino response is slow the read below happens before the arduino has flushed its response out
+                    string response = pkShutter.ReadTo("#"); //.Replace("#", "");
+                    
                     switch (response)
                     {
-                        case "open":
-                            lastShutterState = ShutterState.Open;
-                            break;
-                        case "opening":
-                            lastShutterState = ShutterState.Opening;
-                            break;
-                        case "closed":
-                            lastShutterState = ShutterState.Closed;
-                            break;
-                        case "closing":
-                            lastShutterState = ShutterState.Closing;
-                            break;
-                        default:
-                            lastShutterState = ShutterState.Error;
-                            break;
+                        case "open":    lastShutterState = ShutterState.Open;    break;
+                        case "opening": lastShutterState = ShutterState.Opening; break;
+                        case "closed":  lastShutterState = ShutterState.Closed;  break;
+                        case "closing": lastShutterState = ShutterState.Closing; break;
+                        default:        lastShutterState = ShutterState.Error;   break;
                     }
                 }
                 catch
@@ -224,13 +223,42 @@ namespace GowerDome2025.DeviceAccess
                     // if anything goes wrong, mark as error but don’t block
                     lastShutterState = ShutterState.Error;
                 }
-            }, null, 0, 2000); // poll every 2 seconds
+            }, null, 0, 2000); // poll every 1 seconds
         }
 
         public ShutterState ShutterStatus 
         {
             get
             {
+                try
+                {
+                  
+                    if (!pkShutter.IsOpen)
+                    {
+                        pkShutter.Open();
+                       
+                    }
+                    pkShutter.ReadTimeout = 5000;
+                  
+                    pkShutter.Write("SS#");
+                    
+                    
+                    string response = pkShutter.ReadTo("#").Trim().ToLower(); 
+
+                    switch (response)
+                    {
+                        case "open": lastShutterState = ShutterState.Open; break;
+                        case "opening": lastShutterState = ShutterState.Opening; break;
+                        case "closed": lastShutterState = ShutterState.Closed; break;
+                        case "closing": lastShutterState = ShutterState.Closing; break;
+                        default: lastShutterState = ShutterState.Error; break;
+                    }
+                }
+                catch
+                {
+                    // if anything goes wrong, mark as error but don’t block
+                    lastShutterState = ShutterState.Error;
+                }
                 return lastShutterState;
 
             }
@@ -252,26 +280,26 @@ namespace GowerDome2025.DeviceAccess
             {         //todo 22/11/25 - need to remodel to add a control_box.receievetimout=4 and add the receiveterminated code into the try block
                 try
                 {
-                    control_Box.DiscardOutBuffer();
-                    control_Box.DiscardInBuffer(); // this cured the receive problem from Arduino             
-                    control_Box.ReadTimeout = 1000;
+                    //control_Box.DiscardOutBuffer();
+                 //   control_Box.DiscardInBuffer(); // this cured the receive problem from Arduino             
+                    control_Box.ReadTimeout = 4000;
                     control_Box.Write("SL#");                 //  accommodates the SL process in the control box mcu
 
                     
 
 
-                    string SL_response = control_Box.ReadTo("#").Trim();     // ReceiveTerminated("#");            // read what's sent back
-                    SL_response = SL_response.Replace("#", "");                       // remove the # mark
+                    string SL_response = control_Box.ReadTo("#").Trim();     // # mark is not included in the string
+                    
                     if (SL_response == "Moving")                                      // set this condition properly.
                     {
                         lastSlewing = true;
-                        return true;
+                        return lastSlewing;
 
                     }
                     else
                     {
                         lastSlewing = false;
-                        return false;
+                        return lastSlewing;
                     }
                 }
 
@@ -332,18 +360,46 @@ namespace GowerDome2025.DeviceAccess
 
         public void CloseShutter()
         {
-            try
+            const string command = "CS#";
+            const int maxRetries = 3;
+            int attempt = 0;
+
+            while (attempt < maxRetries)
             {
-                control_Box.DiscardOutBuffer();
-                control_Box.Write("CS#");    // halt dome slewing
+                try
+                {
+                    if (pkShutter == null)
+                    {
+                        throw new InvalidOperationException("Control box not initialized.");
+                    }
+                    if (!pkShutter.IsOpen)
+                    {
+                        pkShutter.Open();
+                        Thread.Sleep(1500);
 
+                    }
+
+                    pkShutter.WriteTimeout = 3000;
+                    pkShutter.Write(command);
+                    break;   // if we reach here the try succedded so leave the loop
+                }
+                catch (Exception ex)
+                {
+                    attempt++;
+                }
+
+
+
+                if (attempt >= maxRetries)
+                {
+                    // escalate after retries exhausted
+
+                }
+
+                System.Threading.Thread.Sleep(200); // brief pause before retry
             }
-            catch
-            {// do nothing in event of failure todo this needs better catch
-
-            }
-
-            // throw new NotImplementedException();
+            lastShutterState = ShutterState.Closing;   
+            // comment?
         }
 
         public void CommandBlind(string command, bool raw = false)
@@ -406,7 +462,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 control_Box = new SerialPort(DomeSettings.ControlBoxComPort, 19200, Parity.None, 8, StopBits.One);
                 control_Box.Open();
-                Thread.Sleep(500);
+                control_Box.ReadTimeout = 4000;
                 // optional: configure timeouts, event handlers, etc.
             }
 
@@ -415,7 +471,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 pkShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
                 pkShutter.Open();
-                Thread.Sleep(500);
+                pkShutter.ReadTimeout = 4000;
             }
         }
 
@@ -472,6 +528,16 @@ namespace GowerDome2025.DeviceAccess
             // disconnect the hardware use try catch in case the objects might be null
             try
             {
+                if (shutterPollTimer != null)
+                {
+                    shutterPollTimer.Dispose();
+                    shutterPollTimer = null;
+                }
+                if (pollTimer != null)
+                {
+                    pollTimer.Dispose();   // stop the timer and release resources
+                    pollTimer = null;      // clear the reference
+                }
                 control_Box.Close();
 
                 pkShutter.Close();
@@ -545,24 +611,26 @@ namespace GowerDome2025.DeviceAccess
             {
                 try
                 {
-                    if (control_Box == null)
+                    if (pkShutter == null)
                     {
                         throw new InvalidOperationException("Control box not initialized.");
                     }
-                    if (!control_Box.IsOpen)
+                    if (!pkShutter.IsOpen)
                     {
-                        control_Box.Open();
+                        pkShutter.Open();
+                        Thread.Sleep(1500);
 
                     }
 
-                    control_Box.WriteTimeout = 3000;
-                    control_Box.Write(command);
+                    pkShutter.WriteTimeout = 3000;
+                    pkShutter.Write(command);
+                    break;   // if we reach here the try succedded so leave the loop
                 }
                 catch (Exception ex)
                 {
-                    
+                    attempt++;
                 }
-                attempt++;
+                
 
 
                 if (attempt >= maxRetries)
@@ -573,6 +641,7 @@ namespace GowerDome2025.DeviceAccess
 
                 System.Threading.Thread.Sleep(200); // brief pause before retry
             }
+            lastShutterState = ShutterState.Opening;
         }
 
 
