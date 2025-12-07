@@ -201,7 +201,7 @@ namespace GowerDome2025.DeviceAccess
                         domeShutter.Open();
                         Thread.Sleep(1500);
                     }
-                    domeShutter.ReadTimeout = 1500;
+                    domeShutter.ReadTimeout = 4000;
                    // pkShutter.DiscardInBuffer();
                    // pkShutter.DiscardOutBuffer();
                     domeShutter.Write("SS#");
