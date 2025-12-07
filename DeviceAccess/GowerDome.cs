@@ -14,8 +14,8 @@ namespace GowerDome2025.DeviceAccess
     public class GowerDome : IDomeV3
     {
 
-        private SerialPort control_Box = new SerialPort("COM3", 9600);   // see comment below
-        private SerialPort domeShutter = new SerialPort("COM3", 9600);    // this is to satisfy the silly C# compiler. COM3 is never used. The port will be reassigned in identifycomports()
+        private SerialPort control_Box =  new SerialPort(DomeSettings.ControlBoxComPort, 19200);   // see comment below
+        private SerialPort domeShutter = new SerialPort(DomeSettings.ShutterComPort, 19200);    // the property getter reads the comport from the xml profile
 
 
         private double lastAzimuth = 27;
