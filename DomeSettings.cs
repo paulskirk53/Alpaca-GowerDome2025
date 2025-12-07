@@ -67,10 +67,10 @@ namespace GowerDome2025
                         using (SerialPort testPort = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One))
                         {
                             //messages.Add($"writing to port {portName}");
-                            testPort.ReadTimeout = 500;
+                            testPort.ReadTimeout = 4000;      // empirical tes showed 3000 worked fo arduino mega2560, so 4000 as safety
                             testPort.WriteTimeout = 500;
                             testPort.Open();
-                            Thread.Sleep(1500);             // required setup time for mcu with bootloader
+                            //Thread.Sleep(2000);             // required setup time for mcu with bootloader
                             testPort.DiscardInBuffer();
                             testPort.DiscardOutBuffer();
 

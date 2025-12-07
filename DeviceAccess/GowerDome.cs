@@ -15,7 +15,7 @@ namespace GowerDome2025.DeviceAccess
     {
 
         private SerialPort control_Box = new SerialPort("COM3", 9600);   // see comment below
-        private SerialPort pkShutter = new SerialPort("COM3", 9600);    // this is to satisfy the silly C# compiler. COM3 is never used. The port will be reassigned in identifycomports()
+        private SerialPort domeShutter = new SerialPort("COM3", 9600);    // this is to satisfy the silly C# compiler. COM3 is never used. The port will be reassigned in identifycomports()
 
 
         private double lastAzimuth = 27;
@@ -196,18 +196,18 @@ namespace GowerDome2025.DeviceAccess
                 {
                     //  if (pkShutter == null)      // || !pkShutter.IsOpen)
                     //    return; // skip until connected
-                    if (!pkShutter.IsOpen)
+                    if (!domeShutter.IsOpen)
                     {
-                        pkShutter.Open();
+                        domeShutter.Open();
                         Thread.Sleep(1500);
                     }
-                    pkShutter.ReadTimeout = 1500;
+                    domeShutter.ReadTimeout = 1500;
                    // pkShutter.DiscardInBuffer();
                    // pkShutter.DiscardOutBuffer();
-                    pkShutter.Write("SS#");
+                    domeShutter.Write("SS#");
 
                     Thread.Sleep(200);                    // if arduino response is slow the read below happens before the arduino has flushed its response out
-                    string response = pkShutter.ReadTo("#"); //.Replace("#", "");
+                    string response = domeShutter.ReadTo("#"); //.Replace("#", "");
                     
                     switch (response)
                     {
@@ -233,17 +233,17 @@ namespace GowerDome2025.DeviceAccess
                 try
                 {
                   
-                    if (!pkShutter.IsOpen)
+                    if (!domeShutter.IsOpen)
                     {
-                        pkShutter.Open();
+                        domeShutter.Open();
                        
                     }
-                    pkShutter.ReadTimeout = 5000;
+                    domeShutter.ReadTimeout = 5000;
                   
-                    pkShutter.Write("SS#");
+                    domeShutter.Write("SS#");
                     
                     
-                    string response = pkShutter.ReadTo("#").Trim().ToLower(); 
+                    string response = domeShutter.ReadTo("#").Trim().ToLower(); 
 
                     switch (response)
                     {
@@ -344,7 +344,7 @@ namespace GowerDome2025.DeviceAccess
             {
                 control_Box.DiscardOutBuffer();
                 control_Box.Write("ES#");    // halt dome slewing
-                pkShutter.Write("ES#");      // halt shutter and close it safely if open or part open
+                domeShutter.Write("ES#");      // halt shutter and close it safely if open or part open
             }
             catch
             {// do nothing in event of failure todo this needs better catch
@@ -368,19 +368,19 @@ namespace GowerDome2025.DeviceAccess
             {
                 try
                 {
-                    if (pkShutter == null)
+                    if (domeShutter == null)
                     {
                         throw new InvalidOperationException("Control box not initialized.");
                     }
-                    if (!pkShutter.IsOpen)
+                    if (!domeShutter.IsOpen)
                     {
-                        pkShutter.Open();
+                        domeShutter.Open();
                         Thread.Sleep(1500);
 
                     }
 
-                    pkShutter.WriteTimeout = 3000;
-                    pkShutter.Write(command);
+                    domeShutter.WriteTimeout = 3000;
+                    domeShutter.Write(command);
                     break;   // if we reach here the try succedded so leave the loop
                 }
                 catch (Exception ex)
@@ -399,7 +399,7 @@ namespace GowerDome2025.DeviceAccess
                 System.Threading.Thread.Sleep(200); // brief pause before retry
             }
             lastShutterState = ShutterState.Closing;   
-            // comment?
+            
         }
 
         public void CommandBlind(string command, bool raw = false)
@@ -427,7 +427,7 @@ namespace GowerDome2025.DeviceAccess
 
                 SetupPorts();
 
-                if (control_Box == null || pkShutter == null)
+                if (control_Box == null || domeShutter == null)
                 {
                     throw new InvalidOperationException("One or both MCUs could not be identified.");
                 }
@@ -469,59 +469,13 @@ namespace GowerDome2025.DeviceAccess
             // Shutter
             if (!string.IsNullOrEmpty(DomeSettings.ShutterComPort))  // we know what port is in use from Identifycomports()
             {
-                pkShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
-                pkShutter.Open();
-                pkShutter.ReadTimeout = 4000;
+                domeShutter = new SerialPort(DomeSettings.ShutterComPort, 19200, Parity.None, 8, StopBits.One);
+                domeShutter.Open();
+                domeShutter.ReadTimeout = 4000;
             }
         }
 
-        private void IdentifyMCUPorts()  // this method not used anywhere todo remove
-        {
-            string[] ports = SerialPort.GetPortNames();
-
-            foreach (string portName in ports)
-            {
-                try
-                {
-                    using (SerialPort testPort = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One))
-                    {
-                        testPort.ReadTimeout = 500;
-                        testPort.WriteTimeout = 500;
-                        testPort.Open();
-
-                        testPort.DiscardInBuffer();
-                        testPort.DiscardOutBuffer();
-
-                        testPort.WriteLine("controlbox");
-                        Thread.Sleep(500);
-                        string response = testPort.ReadLine().Trim().ToLower();
-                        if (response == "controlbox")
-                        {
-                            control_Box = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One);
-                            control_Box.Open();
-                            continue;
-                        }
-
-                        testPort.DiscardInBuffer();
-                        testPort.DiscardOutBuffer();
-                        testPort.WriteLine("shutter");
-                        Thread.Sleep(200);
-                        response = testPort.ReadLine().Trim().ToLower();
-                        if (response == "shutter")
-                        {
-                            pkShutter = new SerialPort(portName, 19200, Parity.None, 8, StopBits.One);
-                            pkShutter.Open();
-                        }
-                    }
-                }
-                catch { /* Ignore errors during scanning */ }
-            }
-
-        }
-
-
-
-
+       
 
         public void Disconnect()
         {
@@ -540,7 +494,7 @@ namespace GowerDome2025.DeviceAccess
                 }
                 control_Box.Close();
 
-                pkShutter.Close();
+                domeShutter.Close();
                 connectedState = false;
                 Dispose();
             }
@@ -554,13 +508,13 @@ namespace GowerDome2025.DeviceAccess
 
         public void Dispose()
         {
-            if (pkShutter != null)
+            if (domeShutter != null)
             {
-                if (pkShutter.IsOpen)
-                    pkShutter.Close();   // closes the port safely
+                if (domeShutter.IsOpen)
+                    domeShutter.Close();   // closes the port safely
 
-                pkShutter.Dispose();     // releases unmanaged resources
-                pkShutter = null;        // optional: clear reference
+                domeShutter.Dispose();     // releases unmanaged resources
+                domeShutter = null;        // optional: clear reference
             }
 
             if (control_Box != null)
@@ -611,19 +565,19 @@ namespace GowerDome2025.DeviceAccess
             {
                 try
                 {
-                    if (pkShutter == null)
+                    if (domeShutter == null)
                     {
                         throw new InvalidOperationException("Control box not initialized.");
                     }
-                    if (!pkShutter.IsOpen)
+                    if (!domeShutter.IsOpen)
                     {
-                        pkShutter.Open();
+                        domeShutter.Open();
                         Thread.Sleep(1500);
 
                     }
 
-                    pkShutter.WriteTimeout = 3000;
-                    pkShutter.Write(command);
+                    domeShutter.WriteTimeout = 3000;
+                    domeShutter.Write(command);
                     break;   // if we reach here the try succedded so leave the loop
                 }
                 catch (Exception ex)

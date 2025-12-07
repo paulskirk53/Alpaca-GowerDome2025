@@ -213,13 +213,14 @@
 
 
 @code{
-   
-   
+
+
 
     private List<string> HardwareMessages = new();
 
     private void CheckHardware()
     {
+        
         HardwareMessages = DomeSettings.IdentifyMCUPorts();
     }
 
