@@ -1,11 +1,13 @@
-﻿using ASCOM.Common.Alpaca;
+﻿using ASCOM;
+using ASCOM.Common.Alpaca;
 using ASCOM.Common.DeviceInterfaces;
 using System;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+
+using System.Timers;
 
 
 namespace GowerDome2025.DeviceAccess
@@ -13,9 +15,10 @@ namespace GowerDome2025.DeviceAccess
 
     public class GowerDome : IDomeV3
     {
-
-        private SerialPort control_Box =  new SerialPort(DomeSettings.ControlBoxComPort, 19200);   // see comment below
-        private SerialPort domeShutter = new SerialPort(DomeSettings.ShutterComPort, 19200);    // the property getter reads the comport from the xml profile
+        // Run IdentifyMCUPorts once at startup so DomeSettings has valid ports
+        List<string> ports = DomeSettings.IdentifyMCUPorts();
+        private SerialPort control_Box  = new SerialPort("COM31", 19200);   //dummy prts
+        private SerialPort? domeShutter = new SerialPort("COM32", 19200);    
 
 
         private double lastAzimuth = 27;
@@ -25,47 +28,47 @@ namespace GowerDome2025.DeviceAccess
 
         public bool connectedState = false;
 
-        public bool Connected      // fetting true connects the hardware.
+        public bool Connected     
         {
             get { return connectedState; }
             set
             {
 
 
-                if (value)    // Connect to hardware requested
+                if (value)    // true = Connect to hardware requested
                 {
                     Connecting = true;
                     try
                     {
-                        Connect();
-                        Task.Run(() => StartPolling());
-                      //  Task.Run(() => StartShutterPolling());
-                        // connectedState = true;   // these are set in connect()
-                        // Connecting = false;
-                    }
-                    catch
-                    {
-                        connectedState = false;
+                        Connect();               //hardware setup
+                        connectedState = true;   // flag set here only
                         Connecting = false;
+
+                        Task.Run(() => StartPolling());
+                      
                     }
+                    catch (ASCOM.InvalidOperationException ex)
+                    {
+                        throw new ASCOM.DriverException("Hardware not available: " + ex.Message, 100);
 
-                    // todo persist data in profile > park azimuth 
-
-
-
-                    // Send sync command to microcontroller
-                    // the correct method with system.io.ports is shown below with "ES" as example
-                    //   control_Box.Write("ES#");
-
-
-                    //control_Box.Transmit("STA" + parkAzimuthStr + "#");    // this should be the current value initialised in the setup dialog
+                    }
+                   
 
                 }
                 else    // Disconnect requested
                 {
-                    Disconnect();     // todo as this is a void routine in alpaca template it will have to go in try - catch, since if disconnect fails
-                                      // connectedstate will be set false and the device will still be connected
-                    connectedState = false;
+
+                    try
+                    {
+                        connectedState = false;
+                        Disconnect();
+                    }
+                    catch (ASCOM.InvalidOperationException ex)
+                    {
+                        throw new ASCOM.DriverException("Hardware not Disconnected: " + ex.Message, 100);
+
+                    }
+
                 }
             }
         }
@@ -139,11 +142,13 @@ namespace GowerDome2025.DeviceAccess
         }
 
         // Background polling task
-        private Timer pollTimer;
+        private System.Timers.Timer pollTimer;
+
 
         public void StartPolling()
         {
-            pollTimer = new Timer(_ =>    // this is a timer which runs in the background to poll the azimuth value. it runs in a separate thread to avoid blocking azimuth calls
+            pollTimer = new System.Timers.Timer(1500);// interval in ms
+            pollTimer.Elapsed += (sender, e) =>
             {
                 try
                 {
@@ -152,17 +157,19 @@ namespace GowerDome2025.DeviceAccess
                         return; // skip until connected
                     //control_Box.DiscardInBuffer();
                     control_Box.Write("AZ#");
-                    Thread.Sleep(200);
+                    Thread.Sleep(400);
                     string response = control_Box.ReadTo("#");
                     if (double.TryParse(response, out double az))
                         lastAzimuth = az;
-                   //
+                    //
                 }
-                catch 
+                catch
                 { /* ignore errors */
-                  
+
                 }
-            }, null, 0, 1500); // poll every 1.5 second
+            };
+            pollTimer.AutoReset = true;
+            pollTimer.Start();
         }
 
        
@@ -185,46 +192,10 @@ namespace GowerDome2025.DeviceAccess
 
 
         // Background polling task for shutter state
-        private Timer shutterPollTimer;
+        //private Timer shutterPollTimer;
         private ShutterState lastShutterState = ShutterState.Error;
 
-        public void StartShutterPolling()
-        {
-            shutterPollTimer = new Timer(_ =>
-            {
-                try
-                {
-                    //  if (pkShutter == null)      // || !pkShutter.IsOpen)
-                    //    return; // skip until connected
-                    if (!domeShutter.IsOpen)
-                    {
-                        domeShutter.Open();
-                        Thread.Sleep(1500);
-                    }
-                    domeShutter.ReadTimeout = 4000;
-                   // pkShutter.DiscardInBuffer();
-                   // pkShutter.DiscardOutBuffer();
-                    domeShutter.Write("SS#");
-
-                    Thread.Sleep(200);                    // if arduino response is slow the read below happens before the arduino has flushed its response out
-                    string response = domeShutter.ReadTo("#"); //.Replace("#", "");
-                    
-                    switch (response)
-                    {
-                        case "open":    lastShutterState = ShutterState.Open;    break;
-                        case "opening": lastShutterState = ShutterState.Opening; break;
-                        case "closed":  lastShutterState = ShutterState.Closed;  break;
-                        case "closing": lastShutterState = ShutterState.Closing; break;
-                        default:        lastShutterState = ShutterState.Error;   break;
-                    }
-                }
-                catch
-                {
-                    // if anything goes wrong, mark as error but don’t block
-                    lastShutterState = ShutterState.Error;
-                }
-            }, null, 0, 2000); // poll every 1 seconds
-        }
+        
 
         public ShutterState ShutterStatus 
         {
@@ -355,7 +326,7 @@ namespace GowerDome2025.DeviceAccess
 
         public string Action(string actionName, string actionParameters)
         {
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
         public void CloseShutter()
@@ -370,7 +341,7 @@ namespace GowerDome2025.DeviceAccess
                 {
                     if (domeShutter == null)
                     {
-                        throw new InvalidOperationException("Control box not initialized.");
+                        throw new ASCOM.InvalidOperationException("Control box not initialized.");
                     }
                     if (!domeShutter.IsOpen)
                     {
@@ -404,17 +375,17 @@ namespace GowerDome2025.DeviceAccess
 
         public void CommandBlind(string command, bool raw = false)
         {
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
         public bool CommandBool(string command, bool raw = false)
         {
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
         public string CommandString(string command, bool raw = false)
         {
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
         public void Connect()
@@ -423,31 +394,21 @@ namespace GowerDome2025.DeviceAccess
             // there is no need to go through identifyconports() again
             try
             {
-                _connecting = true;
-
+               
                 SetupPorts();
 
                 if (control_Box == null || domeShutter == null)
                 {
-                    throw new InvalidOperationException("One or both MCUs could not be identified.");
+                    throw new ASCOM.InvalidOperationException("One or both MCUs could not be identified.");
                 }
 
-                connectedState = true;
-                _connecting = false;
-             //  StartPolling();
-
-                // LogMessage("Connect", "MCUs successfully connected.");
+              
             }
-            catch
+            catch (Exception ex)
             {
-                connectedState = false;
-                _connecting = false;
-                //LogMessage("Connect", $"Connection failed: {ex.Message}");
-                //  throw new AlpacaException(1279, "Failed to connect to MCUs: " + ex.Message);
+                // Wrap in a DriverException so Alpaca clients see a structured error
+                throw new ASCOM.DriverException("Hardware connection failed: " + ex.Message, 1024);
             }
-
-
-
 
 
         }
@@ -460,6 +421,7 @@ namespace GowerDome2025.DeviceAccess
             // Control Box
             if (!string.IsNullOrEmpty(DomeSettings.ControlBoxComPort))  // we know what port is in use from Identifycomports()
             {
+                        
                 control_Box = new SerialPort(DomeSettings.ControlBoxComPort, 19200, Parity.None, 8, StopBits.One);
                 control_Box.Open();
                 control_Box.ReadTimeout = 4000;
@@ -482,25 +444,32 @@ namespace GowerDome2025.DeviceAccess
             // disconnect the hardware use try catch in case the objects might be null
             try
             {
-                if (shutterPollTimer != null)
-                {
-                    shutterPollTimer.Dispose();
-                    shutterPollTimer = null;
-                }
+                
                 if (pollTimer != null)
                 {
-                    pollTimer.Dispose();   // stop the timer and release resources
-                    pollTimer = null;      // clear the reference
+                    pollTimer.Stop();
+                    Thread.Sleep(1500);
                 }
-                control_Box.Close();
+                if (control_Box != null)
+                {
+                    if (control_Box.IsOpen)
+                    { control_Box.Close(); }
+                }  
 
-                domeShutter.Close();
-                connectedState = false;
+
+                if (domeShutter != null)
+                {
+                    if (domeShutter.IsOpen)
+                    { domeShutter.Close(); }  // closes the port safely
+                }
+
+                
                 Dispose();
+
             }
-            catch
+            catch (Exception ex)
             {
-                connectedState = false;
+                throw new ASCOM.DriverException("Hardware disconnection failed: " + ex.Message, 1024);
             }
 
             // throw new NotImplementedException();
@@ -508,24 +477,17 @@ namespace GowerDome2025.DeviceAccess
 
         public void Dispose()
         {
-            if (domeShutter != null)
-            {
-                if (domeShutter.IsOpen)
-                    domeShutter.Close();   // closes the port safely
+            pollTimer.Dispose();   
+            pollTimer = null;      // clear the reference
 
-                domeShutter.Dispose();     // releases unmanaged resources
-                domeShutter = null;        // optional: clear reference
-            }
+            domeShutter.Dispose();     // releases unmanaged resources
+            domeShutter = null;        // optional: clear reference
+            
 
-            if (control_Box != null)
-            {
-                if (control_Box.IsOpen)
-                    control_Box.Close();   // closes the port safely
+            control_Box.Dispose();     // releases unmanaged resources
+            control_Box = null;        // optional: clear reference
 
-                control_Box.Dispose();     // releases unmanaged resources
-                control_Box = null;        // optional: clear reference
-            }
-
+            string x = "";    //todo delete - just used to set a breakpoint
 
             // throw new NotImplementedException();
         }
@@ -567,7 +529,7 @@ namespace GowerDome2025.DeviceAccess
                 {
                     if (domeShutter == null)
                     {
-                        throw new InvalidOperationException("Control box not initialized.");
+                        throw new ASCOM.InvalidOperationException("Control box not initialized.");
                     }
                     if (!domeShutter.IsOpen)
                     {
@@ -618,7 +580,7 @@ namespace GowerDome2025.DeviceAccess
 
         public void SlewToAltitude(double Altitude)
         {
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
         public void SlewToAzimuth(double Azimuth)
@@ -660,7 +622,7 @@ namespace GowerDome2025.DeviceAccess
             }
 
 
-            throw new NotImplementedException();
+            throw new ASCOM.NotImplementedException();
         }
 
     }
